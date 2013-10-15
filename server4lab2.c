@@ -13,8 +13,7 @@
 int main(int argc, char *argv[])
 {
 	int sockfd, client, port;
-	socklen_t fromlen;
-	struct sockaddr_in server, from;
+	struct sockaddr_in server;
 	char buf[BUF_SIZE];
 	
 	// clearing buffer and server struct
@@ -40,14 +39,14 @@ int main(int argc, char *argv[])
 		perror("Binding error");
 		exit(0);
 	}
-	fromlen = sizeof(struct sockaddr_in);
 	
 	printf("server is working\n");
 	
-	while(1){
+	while(1)
+	{
 		listen(sockfd, 1);	// request queue size = 1
-		client = accept(sockfd, (struct sockaddr*)&from, &fromlen);
-		
+		client = accept(sockfd, NULL, NULL);
+				
 		if (client < 0)
 		{ 
 			perror("Accept error");
@@ -55,7 +54,8 @@ int main(int argc, char *argv[])
 		}
 		
 		// receiving and sending back client's messages
-		for(int s = recv(client, buf, BUF_SIZE, 0); s != 0; s = recv(client, buf, BUF_SIZE, 0)){
+		for(int s = recv(client, buf, BUF_SIZE, 0); s != 0; s = recv(client, buf, BUF_SIZE, 0))
+		{
 			send(client, buf, s, 0);
 			memset(buf, 0, s);
 		}
