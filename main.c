@@ -55,10 +55,7 @@ int main(int argc, char *argv[])
 		
 		// receiving and sending back client's messages
 		for(int s = recv(client, buf, BUF_SIZE, 0); s != 0; s = recv(client, buf, BUF_SIZE, 0))
-		{
 			send(client, buf, s, 0);
-			memset(buf, 0, s);
-		}
 		
 		close(client);
 	}
