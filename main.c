@@ -16,6 +16,8 @@ int main(int argc, char *argv[])
 	struct sockaddr_in server;
 	char buf[BUF_SIZE];
 	
+	if(argc > 1)
+		printf("Program does not accept command line arguments.\n");
 	// clearing buffer and server struct
 	memset(buf, 0, BUF_SIZE);			 
 	memset(&server, 0, sizeof(server));
@@ -35,7 +37,7 @@ int main(int argc, char *argv[])
 	server.sin_port = htons(port);
 	
 	if (bind(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0)
-	{ 
+	{
 		perror("Binding error");
 		exit(0);
 	}
