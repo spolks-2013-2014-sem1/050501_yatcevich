@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	memset(&server, 0, sizeof(server));
 	
 	// opening socket
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);	// domain = AF_INET, type = SOCK_STREAM, protocol = 0 (default, TCP)
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	
 	if (sockfd < 0) {
 		perror("Opening socket error");
@@ -54,8 +54,9 @@ int main(int argc, char *argv[])
 		}
 		
 		// receiving and sending back client's messages
-		for(int s = recv(client, buf, BUF_SIZE, 0); s != 0; s = recv(client, buf, BUF_SIZE, 0))
-			send(client, buf, s, 0);
+		int data;
+		while(data = recv(client, buf, BUF_SIZE, 0))
+			send(client, buf, data, 0);
 		
 		close(client);
 	}
