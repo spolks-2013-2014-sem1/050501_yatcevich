@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 	
 	if (sockfd < 0) {
 		perror("Opening socket error");
-		exit(0);
+		exit(1);
 	}
 	
 	server.sin_family = AF_INET;
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	
 	if (bind(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0) {
 		perror("Binding error");
-		exit(0);
+		exit(2);
 	}
 	
 	printf("server is working\n");
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 				
 		if (client < 0) { 
 			perror("Accept error");
-			exit(0);
+			exit(3);
 		}
 		
 		// receiving and sending back client's messages
