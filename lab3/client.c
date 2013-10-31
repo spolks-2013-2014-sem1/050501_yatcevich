@@ -10,6 +10,16 @@
 
 #define BUF_SIZE 1024
 
+void print_received(long received)
+{
+	if(received/(1024*1024))
+		printf("\received: %ld Mb   ", received/(1024*1024));
+	else if(received/1024)
+		printf("\received: %ld kb   ", received/1024);
+	else
+		printf("\received: %ld b", received);
+}
+
 int main(int argc, char *argv[])
 {
 	int server, port, dpart;
@@ -49,11 +59,9 @@ int main(int argc, char *argv[])
 
 	if(file = fopen(filename, "r+"))	// if file exists
 	{
-		while (!feof(file))
+		for(long b = 0; !feof(file); b += fread(buf, 1, sizeof(buf), file))
 		{
-			int b = fread(buf, 1, sizeof(buf), file);
-			int size = ftell(file);
-			printf("\rbytes read: %d, part: %d, pos: %d", b, dpart, size);
+			print_received(b);
 			dpart++;
 		}
 	}
@@ -66,25 +74,29 @@ int main(int argc, char *argv[])
 	    exit(3);
 	}
 	
-	char dparts[10];
+	char dparts[20];
 	sprintf(dparts, "%i", dpart);
 	send(server, dparts, strlen(dparts), 0);
 	
+	long received = 0, nbytes;
 	for(int i = 0; 1; i++) 
 	{
-		int nbytes = recv( server, buf, sizeof(buf), 0 );
+		nbytes = recv( server, buf, sizeof(buf), 0);
+		received += nbytes;
+
 		if(nbytes == 0)
 		{
-			printf("Done.\n");
+			printf("\nDone.");
 			break;
 		}
 		if(nbytes < 0)
 		{
-			perror("Not get byte");
+			perror("Receiving error");
 			break;
 		}
 		fwrite(buf, nbytes, 1, file);
-		printf("\rBytes: %d, part: %d", nbytes, i);
+
+		print_received(received);
 	}
 	printf("\n");
 	fclose(file);

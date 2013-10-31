@@ -10,6 +10,16 @@
 
 #define BUF_SIZE 1024
 
+void print_sended(long sended)
+{
+	if(sended/(1024*1024))
+		printf("\rsended: %ld Mb   ", sended/(1024*1024));
+	else if(sended/1024)
+		printf("\rsended: %ld kb   ", sended/1024);
+	else
+		printf("\rsended: %ld b", sended);
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd, client, port;
@@ -77,13 +87,15 @@ int main(int argc, char *argv[])
 			int dpart = atoi(buf);
 			printf("Download parts %d\n", dpart);
 			
+			long sended = 0, data;
 			for(int i = 0; !feof(file); i++)
 			{
-				int data = fread(buf, 1, sizeof(buf), file);
-				int size = ftell(file);
-				printf("\rbytes read: %d, part: %d, pos: %d", data, i, size);
-				if(b != 0 && (dpart-1) < i)
+				data = fread(buf, 1, sizeof(buf), file);
+				sended += data;
+				if(data != 0 && (dpart-1) < i)
 					send(client, buf, data, 0);
+				
+				print_sended(sended);
 			}
 			printf("\nDone.\n");
 			fclose(file);
