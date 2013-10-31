@@ -13,16 +13,17 @@
 void print_received(long received)
 {
 	if(received/(1024*1024))
-		printf("\received: %ld Mb   ", received/(1024*1024));
+		printf("\rreceived: %ld Mb   ", received/(1024*1024));
 	else if(received/1024)
-		printf("\received: %ld kb   ", received/1024);
+		printf("\rreceived: %ld kb   ", received/1024);
 	else
-		printf("\received: %ld b", received);
+		printf("\rreceived: %ld b", received);
 }
 
 int main(int argc, char *argv[])
 {
-	int server, port, dpart;
+	int server, port;
+	long dpart;
 	struct sockaddr_in server_addr;
 	char buf[BUF_SIZE], filename[40];
 	FILE *file;
@@ -55,16 +56,17 @@ int main(int argc, char *argv[])
 	}
 
 	recv(server, filename, sizeof(filename), 0);
-	dpart = 0;
 
 	if(file = fopen(filename, "r+"))	// if file exists
 	{
-		for(long b = 0; !feof(file); b += fread(buf, 1, sizeof(buf), file))
+		for(dpart = 0; !feof(file); dpart += fread(buf, 1, sizeof(buf), file))
 		{
-			print_received(b);
-			dpart++;
+			if(!dpart)
+				printf("Reading already received part of file...\n");
+			print_received(dpart);
 		}
 	}
+
 	else
 		file = fopen(filename, "w");
 
@@ -75,7 +77,7 @@ int main(int argc, char *argv[])
 	}
 	
 	char dparts[20];
-	sprintf(dparts, "%i", dpart);
+	sprintf(dparts, "%li", dpart);
 	send(server, dparts, strlen(dparts), 0);
 	
 	long received = 0, nbytes;
@@ -94,6 +96,8 @@ int main(int argc, char *argv[])
 			perror("Receiving error");
 			break;
 		}
+		if(!i)
+			printf("Receiving file...\n");
 		fwrite(buf, nbytes, 1, file);
 
 		print_received(received);

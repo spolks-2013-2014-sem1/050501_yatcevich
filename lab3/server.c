@@ -85,14 +85,14 @@ int main(int argc, char *argv[])
 			send(client, basename(filename), sizeof(basename(filename)), 0);	// sending filename
 			recv(client, buf, sizeof(buf), 0);
 			int dpart = atoi(buf);
-			printf("Download parts %d\n", dpart);
 			
-			long sended = 0, data;
-			for(int i = 0; !feof(file); i++)
+			long sended = dpart, data;
+			fseek(file, dpart, SEEK_SET);
+			while(!feof(file))
 			{
 				data = fread(buf, 1, sizeof(buf), file);
 				sended += data;
-				if(data != 0 && (dpart-1) < i)
+				if(data != 0)
 					send(client, buf, data, 0);
 				
 				print_sended(sended);
