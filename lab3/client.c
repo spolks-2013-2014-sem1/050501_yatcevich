@@ -55,7 +55,11 @@ int main(int argc, char *argv[])
 		exit(2);
 	}
 
-	recv(server, filename, sizeof(filename), 0);
+	if(recv(server, filename, sizeof(filename), 0) < 0)	// recv filename
+	{
+		perror("Receiving filename error");
+		exit(10);
+	}
 
 	if(file = fopen(filename, "r+"))	// if file exists
 	{
