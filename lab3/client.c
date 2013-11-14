@@ -87,8 +87,9 @@ int main(int argc, char *argv[])
 	sprintf(downloaded_parts, "%li", dpart);
 	send(server, downloaded_parts, strlen(downloaded_parts), 0);
 	
+	printf("Receiving file...\n");
 	received = 0;
-	for(int i = 0; 1; i++) 
+	while(1) 
 	{
 		n = recv(server, buf, sizeof(buf), 0);
 		received += n;
@@ -103,10 +104,7 @@ int main(int argc, char *argv[])
 			perror("Receiving error");
 			break;
 		}
-		if(!i)
-			printf("Receiving file...\n");
 		fwrite(buf, n, 1, file);
-
 		print_received(received);
 	}
 	printf("\n");
