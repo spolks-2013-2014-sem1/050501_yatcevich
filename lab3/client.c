@@ -23,7 +23,7 @@ void print_received(long received)
 int main(int argc, char *argv[])
 {
 	int server, port;
-	long dpart;
+	long received, n, dpart;
 	struct sockaddr_in server_addr;
 	char buf[BUF_SIZE], filename[80], downloaded_parts[20];
 	FILE *file;
@@ -84,25 +84,25 @@ int main(int argc, char *argv[])
 	sprintf(downloaded_parts, "%li", dpart);
 	send(server, downloaded_parts, strlen(downloaded_parts), 0);
 	
-	long received = 0, nbytes;
+	received = 0;
 	for(int i = 0; 1; i++) 
 	{
-		nbytes = recv(server, buf, sizeof(buf), 0);
-		received += nbytes;
+		n = recv(server, buf, sizeof(buf), 0);
+		received += n;
 
-		if(nbytes == 0)
+		if(n == 0)
 		{
 			printf("\nDone.");
 			break;
 		}
-		if(nbytes < 0)
+		if(n < 0)
 		{
 			perror("Receiving error");
 			break;
 		}
 		if(!i)
 			printf("Receiving file...\n");
-		fwrite(buf, nbytes, 1, file);
+		fwrite(buf, n, 1, file);
 
 		print_received(received);
 	}
