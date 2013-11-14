@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 				printf("Reading already received part of file...\n");
 			print_received(dpart);
 		}
+		printf("\n");
 	}
 
 	else
@@ -86,7 +87,7 @@ int main(int argc, char *argv[])
 	long received = 0, nbytes;
 	for(int i = 0; 1; i++) 
 	{
-		nbytes = recv( server, buf, sizeof(buf), 0);
+		nbytes = recv(server, buf, sizeof(buf), 0);
 		received += nbytes;
 
 		if(nbytes == 0)

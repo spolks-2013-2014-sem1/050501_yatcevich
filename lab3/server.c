@@ -23,6 +23,7 @@ void print_sended(long sended)
 int main(int argc, char *argv[])
 {
 	int sockfd, client, port;
+	long sended, dpart, data;
 	struct sockaddr_in server;
 	char buf[BUF_SIZE], *command, *filename;
 	FILE *file;
@@ -87,17 +88,16 @@ int main(int argc, char *argv[])
 			
 			send(client, (char*)basename(filename), sizeof(basename(filename)), 0);	// sending filename
 			recv(client, buf, sizeof(buf), 0);
-			int dpart = atoi(buf);
+			dpart = atol(buf);
 			
-			long sended = dpart, data;
-			fseek(file, dpart, SEEK_SET);
+			sended = dpart;
+			fseek(file, dpart, SEEK_SET);	// skipping already sended part of file
 			while(!feof(file))
 			{
 				data = fread(buf, 1, sizeof(buf), file);
-				sended += data;
 				if(data != 0)
 					send(client, buf, data, 0);
-				
+				sended += data;
 				print_sended(sended);
 			}
 			printf("\nDone.\n");
