@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 	int server, port;
 	long dpart;
 	struct sockaddr_in server_addr;
-	char buf[BUF_SIZE], filename[40];
+	char buf[BUF_SIZE], filename[80], downloaded_parts[20];
 	FILE *file;
 
 	if(argc > 1)
@@ -80,9 +80,8 @@ int main(int argc, char *argv[])
 	    exit(3);
 	}
 	
-	char dparts[20];
-	sprintf(dparts, "%li", dpart);
-	send(server, dparts, strlen(dparts), 0);
+	sprintf(downloaded_parts, "%li", dpart);
+	send(server, downloaded_parts, strlen(downloaded_parts), 0);
 	
 	long received = 0, nbytes;
 	for(int i = 0; 1; i++) 

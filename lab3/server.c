@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 {
 	int sockfd, client, port;
 	struct sockaddr_in server;
-	char buf[BUF_SIZE], command[5], filename[80];
+	char buf[BUF_SIZE], *command, *filename;
 	FILE *file;
 
 	if(argc > 1)
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	scanf("%d", &port);
 	server.sin_port = htons(port);
 	
-	if(bind(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0) 
+	if(bind(sockfd, (struct sockaddr*)&server, sizeof(server)) < 0) 
 	{
 		perror("Binding error");
 		exit(2);
@@ -59,13 +59,16 @@ int main(int argc, char *argv[])
 	printf("\tsend <filepath+filename> - send file to client\n");
 	printf("\texit - stop server and close this program\n");
 
+	command = (char*)calloc(5, sizeof(char));
+	filename = (char*)calloc(80, sizeof(char));
+
 	while(1) 
 	{
-		scanf("%s", &command);	// reading command
+		scanf("%s", command);	// reading command
 		
 		if(!strcmp(command, "send"))
 		{
-			scanf("%s", &filename);
+			scanf("%s", filename);
 			file = fopen(filename, "r");
 			if(file == NULL)
 			{
@@ -82,7 +85,7 @@ int main(int argc, char *argv[])
 				continue;
 			}
 			
-			send(client, basename(filename), sizeof(basename(filename)), 0);	// sending filename
+			send(client, (char*)basename(filename), sizeof(basename(filename)), 0);	// sending filename
 			recv(client, buf, sizeof(buf), 0);
 			int dpart = atoi(buf);
 			
