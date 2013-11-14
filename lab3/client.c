@@ -52,12 +52,14 @@ int main(int argc, char *argv[])
 	if(connect(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
 	{
 		perror("Connect error");
+		close(server);
 		exit(2);
 	}
 
 	if(recv(server, filename, sizeof(filename), 0) < 0)	// recv filename
 	{
 		perror("Receiving filename error");
+		close(server);
 		exit(10);
 	}
 
@@ -78,6 +80,7 @@ int main(int argc, char *argv[])
 	if(file == NULL)
 	{
 	    perror("Opening file error");
+	    close(server);
 	    exit(3);
 	}
 	
