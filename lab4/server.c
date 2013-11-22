@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #define BUF_SIZE 1024
+#define MAX_FNAME_LEN 256
 
 void print_sended(long sended)
 {
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
 	printf("\texit - stop server and close this program\n");
 
 	command = (char*)calloc(5, sizeof(char));
-	filename = (char*)calloc(80, sizeof(char));
+	filename = (char*)calloc(MAX_FNAME_LEN, sizeof(char));
 
 	while(1) 
 	{
@@ -86,7 +87,9 @@ int main(int argc, char *argv[])
 				continue;
 			}
 			
-			send(client, (char*)basename(filename), sizeof(basename(filename)), 0);	// sending filename
+			// sending filename
+			send(client, (char*)basename(filename), strlen((char*)basename(filename)) * sizeof(char), 0);
+			
 			recv(client, buf, sizeof(buf), 0);
 			dpart = atol(buf);
 			
@@ -102,7 +105,7 @@ int main(int argc, char *argv[])
 				if(sended - dpart > lets_send_0)	// sending special zero
 				{
 					send(client, "0", 1, MSG_OOB);
-					lets_send_0 += 1024 * 1014;
+					lets_send_0 += 1024 * 1024;
 					print_sended(sended);
 				}
 			}

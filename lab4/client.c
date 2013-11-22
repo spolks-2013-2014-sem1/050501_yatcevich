@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #define BUF_SIZE 1024
+#define MAX_FNAME_LEN 256
 
 void print_received(long received)
 {
@@ -23,18 +24,19 @@ void print_received(long received)
 int main(int argc, char *argv[])
 {
 	int server, port;
-	long received, n, dpart;
+	long received, n, dpart = 0;
 	struct sockaddr_in server_addr;
-	char buf[BUF_SIZE], filename[80], downloaded_parts[20];
+	char buf[BUF_SIZE], filename[MAX_FNAME_LEN], downloaded_parts[20];
 	FILE *file;
 
 	if(argc > 1)
 		printf("Program does not accept command line arguments.\n");
 	
-	// clearing buffer and server_addr struct
+	// some cleaning
 	memset(buf, 0, BUF_SIZE);			 
 	memset(&server_addr, 0, sizeof(server_addr));
-	
+	memset(filename, 0, MAX_FNAME_LEN);
+
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = INADDR_ANY;
 	printf("port: ");
@@ -55,7 +57,7 @@ int main(int argc, char *argv[])
 		exit(2);
 	}
 
-	if(recv(server, filename, sizeof(filename), 0) < 0)	// recv filename
+	if(recv(server, filename, MAX_FNAME_LEN, 0) < 0)	// recv filename
 	{
 		perror("Receiving filename error");
 		close(server);
@@ -67,12 +69,11 @@ int main(int argc, char *argv[])
 		for(dpart = 0; !feof(file); dpart += fread(buf, 1, sizeof(buf), file))
 		{
 			if(!dpart)
-				printf("Reading already received part of file...\n");
+				printf("Reading already received part of file %s...\n", filename);
 			print_received(dpart);
 		}
 		printf("\n");
 	}
-
 	else
 		file = fopen(filename, "w");
 
@@ -86,7 +87,7 @@ int main(int argc, char *argv[])
 	sprintf(downloaded_parts, "%li", dpart);
 	send(server, downloaded_parts, strlen(downloaded_parts), 0);
 	
-	printf("Receiving file...\n");
+	printf("Receiving file %s...\n", filename);
 	received = 0;
 	while(1) 
 	{
