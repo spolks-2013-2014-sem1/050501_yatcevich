@@ -26,7 +26,6 @@ void urg_handler(int signo)
 	char small_buf;
 	recv(server, &small_buf, 1, MSG_OOB);
 	print_progress("received", received);
-	//printf("handler \n");
 }
 
 int main(int argc, char *argv[])
@@ -87,7 +86,8 @@ int main(int argc, char *argv[])
 		printf("Reading already received part of file %s...\n", filename);
 		fseek(file, 0, SEEK_END);	// skipping already received part of file
 		dpart = ftell(file);
-		print_progress("read", dpart);
+		if(dpart)
+			print_progress("read", dpart);
 		printf("\n");
 	}
 	else
