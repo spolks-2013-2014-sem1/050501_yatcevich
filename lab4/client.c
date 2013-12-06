@@ -69,7 +69,8 @@ int main(int argc, char *argv[])
 
 	urg_signal.sa_handler = urg_handler;
 	sigaction(SIGURG, &urg_signal, NULL);
-	if(fcntl(server, F_SETOWN, getpid()) < 0) {
+	if(fcntl(server, F_SETOWN, getpid()) < 0) 
+	{
 		perror("fcntl()");
 		exit(10);
 	}
