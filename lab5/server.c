@@ -7,24 +7,19 @@
 #include <string.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <libgen.h>
+
+#include "../libspolks/libspolks.c"
+
 
 #define BUF_SIZE 1024
 #define MAX_FNAME_LEN 256
 
-void print_sended(long sended)
-{
-	if(sended/(1024*1024))
-		printf("\rsended: %ld Mb   ", sended/(1024*1024));
-	else if(sended/1024)
-		printf("\rsended: %ld kb   ", sended/1024);
-	else
-		printf("\rsended: %ld b", sended);
-}
 
 int send_file_tcp(char *filename, int socket)
 {
 	int client;
-	long sended, dpart = 0, length, lets_send_0;
+	long sent, dpart = 0, length, lets_send_0;
 	char buf[BUF_SIZE];
 	FILE *file;
 
@@ -37,6 +32,7 @@ int send_file_tcp(char *filename, int socket)
 		return 1;
 	}
 
+	printf("waiting for client...\n");
 	listen(socket, 1);
 	client = accept(socket, NULL, NULL);
 	
@@ -52,20 +48,20 @@ int send_file_tcp(char *filename, int socket)
 	recv(client, buf, sizeof(buf), 0);
 	dpart = atol(buf);
 	
-	sended = dpart;
+	sent = dpart;
 	fseek(file, dpart, SEEK_SET);	// skipping already sended part of file
 	while(!feof(file))
 	{
 		length = fread(buf, 1, sizeof(buf), file);
 		if(length != 0)
 			send(client, buf, length, 0);
-		sended += length;
+		sent += length;
 		
-		if(sended - dpart > lets_send_0)	// sending special zero
+		if(sent - dpart > lets_send_0)	// sending special zero
 		{
 			send(client, "0", 1, MSG_OOB);
 			lets_send_0 += 1024 * 1024;
-			print_sended(sended);
+			print_progress("total sent", sent);
 		}
 	}
 	printf("\nDone.\n");
@@ -77,11 +73,11 @@ int send_file_tcp(char *filename, int socket)
 int send_file_udp(char *filename, int socket)
 {
 	int client;
-	long sended, dpart = 0, length, lets_send_0;
+	long sent, dpart = 0, length, filesize, lets_send_0;
+	struct sockaddr_in from;
+    socklen_t fromlen = sizeof(from);
 	char buf[BUF_SIZE];
 	FILE *file;
-
-	memset(buf, 0, BUF_SIZE);	// clearing buffer
 
 	file = fopen(filename, "r");
 	if(file == NULL)
@@ -90,29 +86,40 @@ int send_file_udp(char *filename, int socket)
 		return 1;
 	}
 
-	//listen(socket, 1);
-	//client = accept(socket, NULL, NULL);
-	
-	// sending filename
-	while(send(socket, (char*)basename(filename), strlen((char*)basename(filename)) * sizeof(char), 0) < 0)
-		sleep(300);
-		
-printf("fname sended\n");	
+	recvfrom(socket, buf, 5, 0, (struct sockaddr*)&from, &fromlen); 	// receiving "hello"
+	memset(buf, 0, BUF_SIZE);	// clearing buffer
 
-	recv(socket, buf, sizeof(buf), 0);
+	// sending filename
+	sendto(socket, (char*)basename(filename), strlen((char*)basename(filename)) * sizeof(char), 0,
+		(struct sockaddr*)&from, fromlen);
+	
+	// sending filesize
+	fseek(file, dpart, SEEK_END);
+	filesize = ftell(file);
+	sendto(socket, &filesize, sizeof(long), 0, (struct sockaddr*)&from, fromlen);
+
+	// receiving downloaded part size
+	recvfrom(socket, buf, sizeof(buf), 0, (struct sockaddr*)&from, &fromlen);
 	dpart = atol(buf);
 	
-	sended = dpart;
+	sent = dpart;
 	fseek(file, dpart, SEEK_SET);	// skipping already sended part of file
 	while(!feof(file))
 	{
 		length = fread(buf, 1, sizeof(buf), file);
-		if(length != 0)
-			send(socket, buf, length, 0);
-		sended += length;
 		
-		print_sended(sended);
+		if(length)
+			length = sendto(socket, buf, length, 0, (struct sockaddr*)&from, fromlen);
+		if(length < 0)
+		{
+			perror("Packet lost error");
+			return -1;
+		}
+		sent += length;
+		print_progress("total sent", sent);
 	}
+	dpart = -1;
+	sendto(socket, &dpart, 1, 0, (struct sockaddr*)&from, fromlen);
 	printf("\nDone.\n");
 	fclose(file);
 	close(socket);
@@ -122,13 +129,13 @@ printf("fname sended\n");
 int main(int argc, char *argv[])
 {
 	int socket_tcp, socket_udp, client, port;
-	struct sockaddr_in server;
+	struct sockaddr_in addr;
 	char *command, *filename, *protocol;
 
 	if(argc > 1)
 		printf("Program does not accept command line arguments.\n");
 				 
-	memset(&server, 0, sizeof(server));	// clearing server struct
+	memset(&addr, 0, sizeof(addr));	// clearing addr struct
 	
 	// opening sockets
 	socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
@@ -139,18 +146,24 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = INADDR_ANY;
 	printf("port: ");
 	scanf("%d", &port);
-	server.sin_port = htons(port);
+	addr.sin_port = htons(port);
 	
-	if(bind(socket_tcp, (struct sockaddr*)&server, sizeof(server)) < 0) 
+	if(bind(socket_tcp, (struct sockaddr*)&addr, sizeof(addr)) < 0) 
 	{
 		perror("Binding error");
 		exit(2);
 	}
 	
+	if(bind(socket_udp, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+	{
+		perror("Connect udp socket error");
+		exit(3);
+	}
+
 	printf("Server is working.\n");
 	printf("Commands:\n");
 	printf("\tsend <udp/tcp> <filepath+filename> - send file to client\n");

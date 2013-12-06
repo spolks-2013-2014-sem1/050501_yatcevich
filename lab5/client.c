@@ -1,40 +1,58 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <netinet/in.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <string.h>
 #include <netdb.h>
-#include <stdio.h>
+#include <string.h>
+#include <libgen.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "../libspolks/libspolks.c"
+
 
 #define BUF_SIZE 1024
 #define MAX_FNAME_LEN 256
 
-void print_received(long received)
+
+long received = 0;
+int server = 0;
+void urg_handler(int signo)
 {
-	if(received/(1024*1024))
-		printf("\rreceived: %ld Mb   ", received/(1024*1024));
-	else if(received/1024)
-		printf("\rreceived: %ld kb   ", received/1024);
-	else
-		printf("\rreceived: %ld b", received);
+	char small_buf;
+	recv(server, &small_buf, 1, MSG_OOB);
+	print_progress("received", received);
 }
 
-int recv_file_tcp(int server, struct sockaddr_in server_addr)
+int recv_file_tcp(struct sockaddr_in server_addr)
 {
-	long received, n, dpart = 0;
+	long n, dpart = 0;
+	struct sigaction urg_signal;
 	char buf[BUF_SIZE], filename[MAX_FNAME_LEN], downloaded_parts[20];
 	FILE *file;
 
 	// some cleaning
 	memset(buf, 0, BUF_SIZE);
 	memset(filename, 0, MAX_FNAME_LEN);
-	
+	memset(&urg_signal, 0, sizeof(server_addr));
+
 	if(connect(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
 	{
 		perror("Connect error");
 		exit(2);
+	}
+
+	urg_signal.sa_handler = urg_handler;
+	sigaction(SIGURG, &urg_signal, NULL);
+	if(fcntl(server, F_SETOWN, getpid()) < 0) 
+	{
+		perror("fcntl error");
+		exit(10);
 	}
 
 	if(recv(server, filename, MAX_FNAME_LEN, 0) < 0)	// recv filename
@@ -50,7 +68,7 @@ int recv_file_tcp(int server, struct sockaddr_in server_addr)
 		{
 			if(!dpart)
 				printf("Reading already received part of file %s...\n", filename);
-			print_received(dpart);
+			print_progress("read", dpart);
 		}
 		printf("\n");
 	}
@@ -72,11 +90,11 @@ int recv_file_tcp(int server, struct sockaddr_in server_addr)
 	received = 0;
 	while(1) 
 	{
-		if(sockatmark(server) == 1)
+		/*if(sockatmark(server) == 1)
 		{
             recv(server, buf, 1, MSG_OOB);
             print_received(received);
-        }
+        }*/
 
 		n = recv(server, buf, sizeof(buf), 0);
 		received += n;
@@ -91,6 +109,7 @@ int recv_file_tcp(int server, struct sockaddr_in server_addr)
 			perror("Receiving error");
 			break;
 		}
+		
 		fwrite(buf, n, 1, file);
 	}
 	printf("\n");
@@ -98,9 +117,10 @@ int recv_file_tcp(int server, struct sockaddr_in server_addr)
 	return 0;
 }
 
-int recv_file_udp(int server, struct sockaddr_in server_addr)
+int recv_file_udp(struct sockaddr_in addr)
 {
-	long received, n, dpart = 0;
+	long n, dpart = 0, filesize;
+	socklen_t addrlen = sizeof(addr);
 	char buf[BUF_SIZE], filename[MAX_FNAME_LEN], downloaded_parts[20];
 	FILE *file;
 
@@ -108,28 +128,27 @@ int recv_file_udp(int server, struct sockaddr_in server_addr)
 	memset(buf, 0, BUF_SIZE);
 	memset(filename, 0, MAX_FNAME_LEN);
 	
-	if(connect(server, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+	sendto(server, "hello", 5, 0, (struct sockaddr*)&addr, addrlen);	// send "hello"
+
+	// recv filename
+	if(recvfrom(server, filename, MAX_FNAME_LEN, 0, 
+		(struct sockaddr *)&addr, &addrlen) < 0)
 	{
-		perror("Connect error");
-		exit(2);
+		perror("Receiving filename error");
+		close(server);
+		exit(10);
 	}
-printf("connected\n");
-	while(recv(server, filename, MAX_FNAME_LEN, 0) < 0)	// recv filename
-	{
-		//perror("Receiving filename error");
-		//close(server);
-		//exit(10);
-		sleep(300);
-	}
-printf("fname received\n");
+
+	// recv filesize
+	recvfrom(server, &filesize, sizeof(long), 0, (struct sockaddr *)&addr, &addrlen);
+
 	if(file = fopen(filename, "r+"))	// if file exists
 	{
-		for(dpart = 0; !feof(file); dpart += fread(buf, 1, sizeof(buf), file))
-		{
-			if(!dpart)
-				printf("Reading already received part of file %s...\n", filename);
-			print_received(dpart);
-		}
+		printf("Reading already received part of file %s...\n", filename);
+		fseek(file, 0, SEEK_END);	// skipping already received part of file
+		dpart = ftell(file);
+		if(dpart)
+			print_progress("read", dpart);
 		printf("\n");
 	}
 
@@ -144,13 +163,13 @@ printf("fname received\n");
 	}
 	
 	sprintf(downloaded_parts, "%li", dpart);
-	send(server, downloaded_parts, strlen(downloaded_parts), 0);
+	sendto(server, downloaded_parts, strlen(downloaded_parts), 0, (struct sockaddr*)&addr, addrlen);
 	
 	printf("Receiving file %s...\n", filename);
 	received = 0;
 	while(1) 
 	{
-		n = recv(server, buf, sizeof(buf), 0);
+		n = recvfrom(server, buf, sizeof(buf), 0, (struct sockaddr*)&addr, &addrlen);
 		received += n;
 
 		if(n == 0)
@@ -163,16 +182,23 @@ printf("fname received\n");
 			perror("Receiving error");
 			break;
 		}
+		if(n == 1 && buf[0] == -1)
+		{
+			printf("\nDone.");
+			break;
+		}
 		fwrite(buf, n, 1, file);
+		print_progress("received", received);
 	}
 	printf("\n");
+	if(received < filesize)
+		printf("Warning: some packets were lost\n");
 	fclose(file);
 	return 0;
 }
 
 int start_client(int port, char *protocol)
 {
-	int server;
 	struct sockaddr_in server_addr;
 
 	// clearing server_addr struct			 
@@ -192,7 +218,7 @@ int start_client(int port, char *protocol)
 			exit(1);
 		}
 		
-		recv_file_tcp(server, server_addr);
+		recv_file_tcp(server_addr);
 	}
 	else if(!strcmp(protocol, "udp"))
 	{
@@ -204,7 +230,7 @@ int start_client(int port, char *protocol)
 			exit(1);
 		}
 		
-		recv_file_udp(server, server_addr);
+		recv_file_udp(server_addr);
 	}
 	else
 	{
