@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 	sigaction(SIGURG, &urg_signal, NULL);
 	if(fcntl(server, F_SETOWN, getpid()) < 0) 
 	{
-		perror("fcntl()");
+		perror("fcntl error");
 		exit(10);
 	}
 
