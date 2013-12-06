@@ -7,24 +7,19 @@
 #include <string.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <libgen.h>
+
+#include "../libspolks/libspolks.c"
+
 
 #define BUF_SIZE 1024
 #define MAX_FNAME_LEN 256
 
-void print_sended(long sended)
-{
-	if(sended/(1024*1024))
-		printf("\rsended: %ld Mb   ", sended/(1024*1024));
-	else if(sended/1024)
-		printf("\rsended: %ld kb   ", sended/1024);
-	else
-		printf("\rsended: %ld b", sended);
-}
 
 int main(int argc, char *argv[])
 {
 	int sockfd, client, port;
-	long sended, dpart, length, lets_send_0;
+	long sent, dpart, length, lets_send_0;
 	struct sockaddr_in server;
 	char buf[BUF_SIZE], *command, *filename;
 	FILE *file;
@@ -78,6 +73,7 @@ int main(int argc, char *argv[])
 				continue;
 			}
 
+			printf("waiting for a client...\n");
 			listen(sockfd, 1);
 			client = accept(sockfd, NULL, NULL);
 			
@@ -93,21 +89,31 @@ int main(int argc, char *argv[])
 			recv(client, buf, sizeof(buf), 0);
 			dpart = atol(buf);
 			
-			sended = dpart;
-			fseek(file, dpart, SEEK_SET);	// skipping already sended part of file
+			if(dpart)
+				printf("%ld b already sent\n", dpart);
+
+			sent = dpart;
+			fseek(file, dpart, SEEK_SET);	// skipping already sent part of file
 			while(!feof(file))
 			{
 				length = fread(buf, 1, sizeof(buf), file);
 				if(length != 0)
-					send(client, buf, length, 0);
-				sended += length;
+					if(send(client, buf, length, 0) < 0)
+					{
+						perror("Sending error");
+						exit(3);
+					}
+				sent += length;
 				
-				if(sended - dpart > lets_send_0)	// sending special zero
+				if(sent - dpart > lets_send_0)	// sending special zero
 				{
+					//sleep(1);
 					send(client, "0", 1, MSG_OOB);
 					lets_send_0 += 1024 * 1024;
-					print_sended(sended);
+					//sleep(1);
 				}
+
+				print_progress("total sent", sent);
 			}
 			printf("\nDone.\n");
 			fclose(file);

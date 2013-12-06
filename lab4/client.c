@@ -1,31 +1,40 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <signal.h>
+#include <netinet/in.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <string.h>
 #include <netdb.h>
-#include <stdio.h>
+#include <string.h>
+#include <libgen.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "../libspolks/libspolks.c"
+
 
 #define BUF_SIZE 1024
 #define MAX_FNAME_LEN 256
 
-void print_received(long received)
+
+long received = 0;
+int server = 0;
+void urg_handler(int signo)
 {
-	if(received/(1024*1024))
-		printf("\rreceived: %ld Mb   ", received/(1024*1024));
-	else if(received/1024)
-		printf("\rreceived: %ld kb   ", received/1024);
-	else
-		printf("\rreceived: %ld b", received);
+	char small_buf;
+	recv(server, &small_buf, 1, MSG_OOB);
+	print_progress("received", received);
+	//printf("handler \n");
 }
 
 int main(int argc, char *argv[])
 {
-	int server, port;
-	long received, n, dpart = 0;
+	int port;
+	long n, dpart = 0;
 	struct sockaddr_in server_addr;
+	struct sigaction urg_signal;
 	char buf[BUF_SIZE], filename[MAX_FNAME_LEN], downloaded_parts[20];
 	FILE *file;
 
@@ -36,6 +45,7 @@ int main(int argc, char *argv[])
 	memset(buf, 0, BUF_SIZE);			 
 	memset(&server_addr, 0, sizeof(server_addr));
 	memset(filename, 0, MAX_FNAME_LEN);
+	memset(&urg_signal, 0, sizeof(server_addr));
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -57,6 +67,13 @@ int main(int argc, char *argv[])
 		exit(2);
 	}
 
+	urg_signal.sa_handler = urg_handler;
+	sigaction(SIGURG, &urg_signal, NULL);
+	if(fcntl(server, F_SETOWN, getpid()) < 0) {
+		perror("fcntl()");
+		exit(10);
+	}
+
 	if(recv(server, filename, MAX_FNAME_LEN, 0) < 0)	// recv filename
 	{
 		perror("Receiving filename error");
@@ -66,12 +83,10 @@ int main(int argc, char *argv[])
 
 	if(file = fopen(filename, "r+"))	// if file exists
 	{
-		for(dpart = 0; !feof(file); dpart += fread(buf, 1, sizeof(buf), file))
-		{
-			if(!dpart)
-				printf("Reading already received part of file %s...\n", filename);
-			print_received(dpart);
-		}
+		printf("Reading already received part of file %s...\n", filename);
+		fseek(file, 0, SEEK_END);	// skipping already received part of file
+		dpart = ftell(file);
+		print_progress("read", dpart);
 		printf("\n");
 	}
 	else
@@ -91,11 +106,11 @@ int main(int argc, char *argv[])
 	received = 0;
 	while(1) 
 	{
-		if(sockatmark(server) == 1)
+		/*if(sockatmark(server))
 		{
-            recv(server, buf, 1, MSG_OOB);
-            print_received(received);
-        }
+            
+            print_progress("received", received);
+        }*/
 
 		n = recv(server, buf, sizeof(buf), 0);
 		received += n;
