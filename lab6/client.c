@@ -49,12 +49,7 @@ int recv_file_tcp(struct sockaddr_in server_addr)
 
 	urg_signal.sa_handler = urg_handler;
 	sigaction(SIGURG, &urg_signal, NULL);
-	if(fcntl(server, F_SETOWN, getpid()) < 0) 
-	{
-		perror("fcntl error");
-		exit(10);
-	}
-
+	
 	if(recv(server, filename, MAX_FNAME_LEN, 0) < 0)	// recv filename
 	{
 		perror("Receiving filename error");
@@ -82,13 +77,16 @@ int recv_file_tcp(struct sockaddr_in server_addr)
 	    exit(3);
 	}
 	
-	//sprintf(downloaded_parts, "%li", dpart);
-	//send(server, downloaded_parts, strlen(downloaded_parts), 0);
-	
 	printf("Receiving file %s...\n", filename);
 	received = 0;
 	while(1) 
 	{
+		if(sockatmark(server))
+		{
+			char small_buf;
+			recv(server, &small_buf, 1, MSG_OOB);
+			print_progress("received", received);
+		}
 		n = recv(server, buf, sizeof(buf), 0);
 		received += n;
 

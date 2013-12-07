@@ -16,8 +16,6 @@
 #define BUF_SIZE 1024
 #define MAX_FNAME_LEN 256
 
-fd_set readset, writeset;
-
 
 int send_file_tcp(char *filename, int socket)
 {
@@ -27,6 +25,7 @@ int send_file_tcp(char *filename, int socket)
 	short *fnames_to_send = (short*)calloc(max_sockets_num, sizeof(short));
 	struct sockaddr_in from;  
 	socklen_t fromlen = sizeof(struct sockaddr_in);
+	fd_set readset, writeset, exset;
 	char buf[BUF_SIZE];
 	FILE *file;
 
@@ -36,6 +35,7 @@ int send_file_tcp(char *filename, int socket)
 	memset(buf, 0, BUF_SIZE);
 	FD_ZERO(&readset);
 	FD_ZERO(&writeset);
+	FD_ZERO(&exset);
 
 	file = fopen(filename, "r");
 	if(file == NULL)
@@ -54,7 +54,7 @@ int send_file_tcp(char *filename, int socket)
 		{
 			fromlen = sizeof(from);
 			client = accept(socket, (struct sockaddr *) &from, &fromlen);
-			fcntl(client, F_SETFL, O_NONBLOCK);
+			//fcntl(client, F_SETFL, O_NONBLOCK);
 			FD_SET(client, &writeset);
 			file_positions[client] = 0;
 			fnames_to_send[client] = 1;
@@ -63,6 +63,14 @@ int send_file_tcp(char *filename, int socket)
 		
 		for(client = 0; client < max_sockets_num; client++)
 		{
+			if(FD_ISSET(client, &exset))
+			{
+				perror("Client error");
+				close(client);
+				FD_CLR(client, &writeset);
+				continue;
+			}
+
 			if ((client != socket) && FD_ISSET(client, &writeset))
 			{
 				if(fnames_to_send[client])
@@ -81,7 +89,7 @@ int send_file_tcp(char *filename, int socket)
 
 				if(file_positions[client] % (1024 * 1024) < 100)	// sending special zero
 				{
-					//send(client, "0", 1, MSG_OOB);
+					send(client, "0", 1, MSG_OOB);
 				}
 
 				fseek(file, file_positions[client], SEEK_SET);	// skipping already sended part of file
