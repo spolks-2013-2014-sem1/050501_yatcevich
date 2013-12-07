@@ -82,19 +82,13 @@ int recv_file_tcp(struct sockaddr_in server_addr)
 	    exit(3);
 	}
 	
-	sprintf(downloaded_parts, "%li", dpart);
-	send(server, downloaded_parts, strlen(downloaded_parts), 0);
+	//sprintf(downloaded_parts, "%li", dpart);
+	//send(server, downloaded_parts, strlen(downloaded_parts), 0);
 	
 	printf("Receiving file %s...\n", filename);
 	received = 0;
 	while(1) 
 	{
-		/*if(sockatmark(server) == 1)
-		{
-            recv(server, buf, 1, MSG_OOB);
-            print_received(received);
-        }*/
-
 		n = recv(server, buf, sizeof(buf), 0);
 		received += n;
 
